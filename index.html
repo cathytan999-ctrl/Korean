@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Korean Movie Word Reader</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:#f7f7f7; color:#171717; display:flex; justify-content:center; }
+  #app { width:100%; max-width:760px; height:100dvh; display:flex; flex-direction:column; background:#fff; }
+  .top { background:#111827; color:#fff; padding:14px 16px 12px; box-shadow:0 4px 14px rgba(0,0,0,.18); }
+  .title { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .title h1 { margin:0; font-size:18px; font-weight:750; }
+  .tag { margin-left:auto; font-size:12px; color:#cbd5e1; }
+  .controls { display:flex; gap:8px; align-items:center; }
+  select, .btn { border-radius:12px; border:1px solid #374151; padding:10px 12px; font-size:14px; }
+  select { flex:1; background:#1f2937; color:#fff; outline:none; }
+  .btn { border:none; cursor:pointer; font-weight:700; background:#e5e7eb; color:#111827; }
+  .btn.live { background:#ef4444; color:#fff; }
+  .listen { display:none; margin-top:9px; color:#d1d5db; font-size:12px; gap:8px; align-items:center; }
+  .listen.on { display:flex; }
+  .dot { width:8px; height:8px; background:#ef4444; border-radius:50%; animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity:.35; } }
+  .tabs { display:flex; border-bottom:1px solid #e5e7eb; background:#fff; }
+  .tab { flex:1; padding:12px 4px; text-align:center; color:#6b7280; font-weight:750; }
+  .tab.active { color:#0b74ff; border-bottom:3px solid #0b74ff; }
+  .reader { flex:1; overflow-y:auto; background:#fafafa; }
+  .empty { text-align:center; color:#737373; padding:36px 24px; line-height:1.55; }
+  .line { background:#fff; border-bottom:1px solid #e5e7eb; padding:18px 16px 14px; }
+  .words { display:flex; flex-wrap:wrap; gap:10px 9px; align-items:flex-end; }
+  .word { display:flex; flex-direction:column; align-items:center; min-width:34px; }
+  .ko { font-size:28px; line-height:1.08; font-weight:800; padding:0 3px 3px; border-radius:4px; }
+  .en { font-size:13px; line-height:1.25; color:#374151; margin-top:4px; max-width:92px; text-align:center; overflow:hidden; text-overflow:ellipsis; }
+  .rom { font-size:12px; color:#9ca3af; margin-bottom:3px; min-height:14px; }
+  .sentence { margin-top:12px; color:#111827; font-size:19px; line-height:1.35; }
+  .raw { margin-top:4px; color:#6b7280; font-size:13px; }
+  .bar { border-top:1px solid #e5e7eb; background:#fff; padding:10px 12px 12px; }
+  .inrow { display:flex; gap:8px; align-items:flex-end; }
+  textarea { flex:1; resize:none; border:1px solid #d1d5db; border-radius:12px; padding:11px; font-size:15px; font-family:inherit; outline:none; max-height:120px; }
+  textarea:focus { border-color:#0b74ff; }
+  .read { background:#0b74ff; color:#fff; border:none; border-radius:12px; padding:12px 16px; font-weight:750; cursor:pointer; }
+  .read:disabled { background:#cbd5e1; }
+  .small { font-size:11px; color:#9ca3af; margin:6px 2px 0; }
+  .err, .loading { margin:12px 16px; border-radius:12px; padding:12px 14px; font-size:14px; }
+  .err { background:#fffbeb; color:#92400e; border:1px solid #fde68a; }
+  .loading { background:#fff; color:#6b7280; border:1px solid #e5e7eb; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <div class="title"><span>🎬</span><h1>Korean Movie Word Reader</h1><span class="tag">Korean top · English bottom</span></div>
+    <div class="controls"><select id="lang"></select><button class="btn" id="mic">🎙️ Listen</button></div>
+    <div class="listen" id="listen"><span class="dot"></span><span>Listening… put your phone near the movie speaker.</span><span id="interim"></span></div>
+  </div>
+  <div class="tabs"><div class="tab active">Subtitles</div><div class="tab">Dictation</div><div class="tab">Shadowing</div></div>
+  <div class="reader" id="reader"><div class="empty" id="empty">Paste Korean subtitles or use the mic. Each spoken line will show <b>Korean words on top</b> and <b>English meaning underneath</b>.</div></div>
+  <div class="bar">
+    <div class="inrow"><textarea id="input" rows="1" placeholder="Paste Korean subtitle here…"></textarea><button class="read" id="read" disabled>Read</button></div>
+    <div class="small">For best result, use Korean subtitles. Live movie listening depends on browser speech recognition.</div>
+  </div>
+</div>
+<script>
+const LANGS=[{name:"Korean → English",sr:"ko-KR",mm:"ko",kr:true},{name:"Chinese → English",sr:"zh-CN",mm:"zh"},{name:"Japanese → English",sr:"ja-JP",mm:"ja"}];
+const CHIPS=["#fde68a","#bbf7d0","#bfdbfe","#fecaca","#ddd6fe","#a7f3d0","#fbcfe8"];
+let lang=LANGS[0];
+const KI=["g","kk","n","d","tt","r","m","b","pp","s","ss","","j","jj","ch","k","t","p","h"];
+const KM=["a","ae","ya","yae","eo","e","yeo","ye","o","wa","wae","oe","yo","u","wo","we","wi","yu","eu","ui","i"];
+const KF=["","k","k","k","n","n","n","t","l","k","m","l","l","l","p","l","m","p","p","t","t","ng","t","t","k","t","p","t"];
+function romanizeKo(str){let out="";for(const ch of str){const c=ch.charCodeAt(0);if(c>=0xAC00&&c<=0xD7A3){const i=c-0xAC00,f=i%28,m=((i-f)/28)%21,ini=(((i-f)/28)-m)/21;out+=KI[ini]+KM[m]+KF[f]+" ";}else out+=ch;}return out.trim();}
+async function translate(text,src){const url=`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${src}|en`;const r=await fetch(url);if(!r.ok)throw new Error("network");const d=await r.json();let t=d?.responseData?.translatedText||"";if(/MYMEMORY WARNING|INVALID/i.test(t))t="";return t;}
+const $=id=>document.getElementById(id), sel=$("lang"), reader=$("reader"), empty=$("empty"), input=$("input"), read=$("read"), mic=$("mic"), listen=$("listen"), interim=$("interim");
+LANGS.forEach((l,i)=>{const o=document.createElement("option");o.value=i;o.textContent=l.name;sel.appendChild(o);});
+sel.onchange=()=>{lang=LANGS[sel.value];};
+input.oninput=()=>{read.disabled=!input.value.trim();input.style.height="auto";input.style.height=Math.min(input.scrollHeight,120)+"px";};
+input.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();submit();}};read.onclick=submit;
+function tokenize(line){return line.match(/[\p{Script=Hangul}]+|[\p{Script=Han}]+|[\p{Script=Hiragana}\p{Script=Katakana}]+|[A-Za-z0-9]+|[^\s]/gu)||[];}
+async function submit(){const line=input.value.trim();if(!line)return;input.value="";input.style.height="auto";read.disabled=true;empty.style.display="none";const load=document.createElement("div");load.className="loading";load.textContent="Breaking words and translating…";reader.appendChild(load);reader.scrollTop=reader.scrollHeight;try{const tokens=tokenize(line).filter(t=>/[^\p{P}\p{S}]/u.test(t));const sentence=await translate(line,lang.mm);const uniq=[...new Set(tokens)].slice(0,60);const map={};await Promise.all(uniq.map(async w=>{try{map[w]=await translate(w,lang.mm);}catch{map[w]="";}}));load.remove();render(line,tokens.map(w=>({w,en:map[w]||"—",rom:lang.kr?romanizeKo(w):""})),sentence);}catch(e){load.remove();const er=document.createElement("div");er.className="err";er.textContent="Translation service failed. Try again or check internet connection.";reader.appendChild(er);}}
+function render(raw,tokens,sentence){const line=document.createElement("div");line.className="line";const words=document.createElement("div");words.className="words";tokens.forEach((t,i)=>{const w=document.createElement("div");w.className="word";const rom=document.createElement("div");rom.className="rom";rom.textContent=t.rom;const ko=document.createElement("div");ko.className="ko";ko.textContent=t.w;ko.style.background=CHIPS[i%CHIPS.length];const en=document.createElement("div");en.className="en";en.textContent=t.en;w.append(rom,ko,en);words.appendChild(w);});const sent=document.createElement("div");sent.className="sentence";sent.textContent=sentence||"(no full translation returned)";const rawEl=document.createElement("div");rawEl.className="raw";rawEl.textContent=raw;line.append(words,sent,rawEl);reader.appendChild(line);reader.scrollTop=reader.scrollHeight;}
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,live=false;if(!SR)mic.style.display="none";mic.onclick=()=>live?stopMic():startMic();function startMic(){try{rec=new SR();rec.lang=lang.sr;rec.interimResults=true;rec.continuous=true;rec.onresult=ev=>{let fin="",itm="";for(let i=ev.resultIndex;i<ev.results.length;i++){const r=ev.results[i];if(r.isFinal)fin+=r[0].transcript;else itm+=r[0].transcript;}interim.textContent=itm;if(fin.trim()){input.value=fin.trim();submit();}};rec.onerror=()=>stopMic();rec.onend=()=>stopMic();rec.start();live=true;mic.classList.add("live");mic.textContent="⏹ Stop";listen.classList.add("on");}catch(e){alert("Mic cannot start here. Paste subtitle text instead.");}}function stopMic(){try{rec&&rec.stop();}catch(e){}live=false;mic.classList.remove("live");mic.textContent="🎙️ Listen";listen.classList.remove("on");interim.textContent="";}
+</script>
+</body>
+</html>
